@@ -1,4 +1,4 @@
-# Confluence Export Tool
+# LLM Query Export Tool (Confluence)
 
 Export and incrementally update Confluence pages as markdown for LLM querying.
 
