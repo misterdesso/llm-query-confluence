@@ -1,6 +1,6 @@
 # LLM Query Export Tool (Confluence)
 
-Export and incrementally update Confluence pages as markdown for LLM querying.
+Export Confluence pages as markdown for LLM querying, update script included.
 
 ## Setup
 
@@ -20,10 +20,10 @@ Export and incrementally update Confluence pages as markdown for LLM querying.
    cp .env.example .env
    ```
    Edit `.env` with:
-   - `CONFLUENCE_DOMAIN` — your Atlassian subdomain (e.g., `yourcompany` for yourcompany.atlassian.net)
+   - `CONFLUENCE_DOMAIN` — your Atlassian subdomain (i.e., `yourcompany` in `yourcompany.atlassian.net`)
    - `CONFLUENCE_EMAIL` — Atlassian account email
    - `CONFLUENCE_API_TOKEN` — generated at https://id.atlassian.net/manage-profile/security/api-tokens
-   - `CONFLUENCE_SPACE_KEY` — the space key to export (visible in the space URL or space settings)
+   - `CONFLUENCE_SPACE_KEY` — space to export (visible in the URL or space settings)
 
 ## Usage
 
