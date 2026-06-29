@@ -55,9 +55,13 @@ Launch Claude Code (or any LLM tool) at this directory. The `CLAUDE.md` file pro
 
 ```
 pages/
-├── _index.json              # Master index of all pages
-└── <SPACE_KEY>/             # Your exported space
-    ├── some-page-title.md
-    ├── another-page.md
-    └── ...
+└── <SPACE_KEY>/
+    ├── _index.json                # Space index (all pages + hierarchy)
+    ├── parent-page/
+    │   ├── _index.md              # Parent page content
+    │   ├── child-page.md          # Leaf child page
+    │   └── nested-parent/
+    │       ├── _index.md
+    │       └── grandchild.md
+    └── standalone-page.md         # Root-level leaf page
 ```
