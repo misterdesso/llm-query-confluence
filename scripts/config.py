@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PAGES_DIR = ROOT_DIR / "pages"
-INDEX_PATH = PAGES_DIR / "_index.json"
 
 load_dotenv(ROOT_DIR / ".env")
 
