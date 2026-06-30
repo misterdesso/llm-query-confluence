@@ -11,6 +11,7 @@ from config import (
     get_session,
     paginate,
 )
+from spinner import Spinner
 from tree import build_tree, compute_all_paths
 
 
@@ -83,8 +84,13 @@ def export_all():
     space_dir.mkdir(parents=True, exist_ok=True)
     index_path = space_dir / "_index.json"
 
-    pages = fetch_pages_for_space(session, space_id)
-    print(f"  {len(pages)} pages")
+    spinner = Spinner("Fetching pages...")
+    spinner.start()
+    try:
+        pages = fetch_pages_for_space(session, space_id)
+    finally:
+        spinner.stop()
+    print(f"  {len(pages)} pages fetched")
 
     # Build pages_by_id from the API response.
     # The Confluence v2 API uses camelCase `parentId`.
@@ -104,47 +110,52 @@ def export_all():
     paths = compute_all_paths(pages_by_id, children)
 
     all_metadata = []
+    
+    spinner = Spinner("Processing pages...")
+    spinner.start()
+    try:
+        for page_id, page_info in pages_by_id.items():
+            raw_page = raw_pages_by_id[page_id]
+            labels = fetch_page_labels(session, page_id)
 
-    for page_id, page_info in pages_by_id.items():
-        raw_page = raw_pages_by_id[page_id]
-        labels = fetch_page_labels(session, page_id)
+            # Resolve parent title from the tree.
+            parent_id = page_info["parent_id"]
+            if parent_id and parent_id in pages_by_id:
+                parent_title = pages_by_id[parent_id]["title"]
+            else:
+                parent_title = ""
 
-        # Resolve parent title from the tree.
-        parent_id = page_info["parent_id"]
-        if parent_id and parent_id in pages_by_id:
-            parent_title = pages_by_id[parent_id]["title"]
-        else:
-            parent_title = ""
+            rel_path = paths[page_id]
 
-        rel_path = paths[page_id]
+            result = convert_page(
+                raw_page, space_key, space_name, labels,
+                parent_id, parent_title,
+            )
 
-        result = convert_page(
-            raw_page, space_key, space_name, labels,
-            parent_id, parent_title,
-        )
+            # Create nested directory structure and write the file.
+            file_path = space_dir / rel_path
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(
+                result["frontmatter"]
+                + f"# {page_info['title']}\n\n"
+                + result["content"],
+                encoding="utf-8",
+            )
 
-        # Create nested directory structure and write the file.
-        file_path = space_dir / rel_path
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(
-            result["frontmatter"]
-            + f"# {page_info['title']}\n\n"
-            + result["content"],
-            encoding="utf-8",
-        )
+            child_ids = children.get(page_id, [])
 
-        child_ids = children.get(page_id, [])
-
-        all_metadata.append({
-            "id": page_id,
-            "title": page_info["title"],
-            "parent_id": parent_id,
-            "parent_title": parent_title,
-            "path": rel_path,
-            "children": child_ids,
-            "labels": labels,
-            "last_modified": result["last_modified"],
-        })
+            all_metadata.append({
+                "id": page_id,
+                "title": page_info["title"],
+                "parent_id": parent_id,
+                "parent_title": parent_title,
+                "path": rel_path,
+                "children": child_ids,
+                "labels": labels,
+                "last_modified": result["last_modified"],
+            })
+    finally:
+        spinner.stop()
 
     index = {
         "space_key": space_key,

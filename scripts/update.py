@@ -12,6 +12,7 @@ from config import (
     get_session,
     paginate,
 )
+from spinner import Spinner
 from tree import build_tree, compute_all_paths
 
 
@@ -22,22 +23,31 @@ def load_index(index_path):
     return json.loads(index_path.read_text(encoding="utf-8"))
 
 
-def fetch_all_current_page_ids(session):
-    url = f"{BASE_URL}/api/v2/pages"
-    params = {"limit": 250, "spaceKey": SPACE_KEY}
+def fetch_space(session):
+    url = f"{BASE_URL}/api/v2/spaces"
+    params = {"limit": 250, "keys": SPACE_KEY}
+    spaces = list(paginate(session, url, params))
+    if not spaces:
+        print(f"Space {SPACE_KEY} not found", file=sys.stderr)
+        sys.exit(1)
+    return spaces[0]
+
+
+def fetch_all_current_page_ids(session, space_id):
+    url = f"{BASE_URL}/api/v2/spaces/{space_id}/pages"
+    params = {"limit": 250}
     ids = set()
     for page in paginate(session, url, params):
         ids.add(page["id"])
     return ids
 
 
-def fetch_modified_pages(session, since_iso):
-    url = f"{BASE_URL}/api/v2/pages"
+def fetch_modified_pages(session, space_id, since_iso):
+    url = f"{BASE_URL}/api/v2/spaces/{space_id}/pages"
     params = {
         "limit": 250,
         "body-format": "storage",
         "sort": "-modified-date",
-        "spaceKey": SPACE_KEY,
     }
     modified = []
     for page in paginate(session, url, params):
@@ -47,13 +57,6 @@ def fetch_modified_pages(session, since_iso):
         else:
             break
     return modified
-
-
-def fetch_space(session, space_id):
-    url = f"{BASE_URL}/api/v2/spaces/{space_id}"
-    resp = session.get(url)
-    resp.raise_for_status()
-    return resp.json()
 
 
 def fetch_page_labels(session, page_id):
@@ -97,12 +100,14 @@ def update():
 
     index = load_index(index_path)
     last_export = index["exported_at"]
-    space_key = index.get("space_key", SPACE_KEY)
-    space_name = index.get("space_name", SPACE_KEY)
+
+    space_info = fetch_space(session)
+    space_id = space_info["id"]
+    space_key = space_info["key"]
+    space_name = space_info["name"]
 
     print(f"Last export: {last_export}")
     print(f"Space: {space_key} ({space_name})")
-    print("Checking for modified pages...")
 
     # ------------------------------------------------------------------
     # 1. Load existing index into pages_by_id
@@ -122,7 +127,12 @@ def update():
     # ------------------------------------------------------------------
     # 2. Fetch and process modified pages
     # ------------------------------------------------------------------
-    modified_pages = fetch_modified_pages(session, last_export)
+    spinner_mod = Spinner("Checking for modified pages...")
+    spinner_mod.start()
+    try:
+        modified_pages = fetch_modified_pages(session, space_id, last_export)
+    finally:
+        spinner_mod.stop()
     print(f"Found {len(modified_pages)} modified pages")
 
     modified_content = {}   # page_id → markdown body text
@@ -132,11 +142,6 @@ def update():
     for page in modified_pages:
         page_id = page["id"]
         title = page["title"]
-        space_id = page.get("spaceId")
-
-        space_info = fetch_space(session, space_id)
-        space_key = space_info["key"]
-        space_name = space_info["name"]
 
         labels = fetch_page_labels(session, page_id)
 
@@ -164,8 +169,12 @@ def update():
     # ------------------------------------------------------------------
     # 3. Detect and remove deleted pages
     # ------------------------------------------------------------------
-    print("Checking for deleted pages...")
-    current_ids = fetch_all_current_page_ids(session)
+    spinner_del = Spinner("Checking for deleted pages...")
+    spinner_del.start()
+    try:
+        current_ids = fetch_all_current_page_ids(session, space_id)
+    finally:
+        spinner_del.stop()
     deleted_count = 0
     for page_id in list(pages_by_id.keys()):
         if page_id not in current_ids:
